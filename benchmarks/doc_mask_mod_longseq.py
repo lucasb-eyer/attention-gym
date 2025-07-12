@@ -17,6 +17,15 @@ def main():
 
     cbm = torch.compile(create_block_mask)
 
+    # Other things to try:
+    # kernel_options = {
+    #     "BLOCK_M": 32,
+    #     "BLOCK_N": 32,
+    #     "num_stages": 2,
+    #     "FORCE_USE_FLEX_ATTENTION": True,
+    # }
+    # Also try vmap
+
     for seqlen in (128, 512, 1024, 4096, 16384, 32768, 65536, 131072, 262144, 524288, 1048576):
         for ndoc in (4, 16, 64, 128, 1024):
             if ndoc >= seqlen:
@@ -31,10 +40,11 @@ def main():
             for _ in range(10):
                 torch.cuda.reset_peak_memory_stats()
                 t0 = time.perf_counter()
-                cbm(mask_mod_fn, B=None, H=None, Q_LEN=seqlen, KV_LEN=seqlen, device=device)
+                ret = cbm(mask_mod_fn, B=None, H=None, Q_LEN=seqlen, KV_LEN=seqlen, device=device)
                 torch.cuda.synchronize(device)
                 seconds.append(time.perf_counter() - t0)
                 peakbytes.append(torch.cuda.max_memory_allocated())
+                del ret
             print(
                 f" median t={med(seconds)*1000:.2f}ms, max m={max(peakbytes) / 1024 / 1024:.2f}MiB",
                 flush=True,
